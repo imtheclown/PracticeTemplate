@@ -1,0 +1,5 @@
+build/**/*.js
+build-server/**/*.js
+public/**/*.js
+node_modules
+server/microservices
