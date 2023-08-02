@@ -12,22 +12,11 @@ module.exports = async (req, res, next) => {
     // get provinces
     try {
       getProvince().then(response => {
-        req.responseData = {
-          statusCode: 200,
-          body: {
-            data: response
-          }
-        };
-        return next();
+        returnData(req, next, response.asyncResponse);
       });
     } catch (error) {
       // display error
-      req.responseData = {
-        statusCode: 400,
-        body: {
-          data: error
-        }
-      };
+      errorCatchAll(req, next, error);
     }
   } else {
     // province and municipality are both present
@@ -37,8 +26,9 @@ module.exports = async (req, res, next) => {
       let municipality_id;
       let barangayList;
       // get province_id
+      let regex = new RegExp(`${province}`, 'ig');
       try {
-        province_id = await getProvince({ name: province });
+        province_id = await getProvince({ name: regex });
         if (
           province_id.asyncResponse &&
           province_id.asyncResponse[0] &&
@@ -48,18 +38,13 @@ module.exports = async (req, res, next) => {
         }
         //   display error
       } catch (err) {
-        req.responseData = {
-          statusCode: 400,
-          error: {
-            data: err
-          }
-        };
-        return next();
+        errorCatchAll(req, next, err);
       }
+      regex = new RegExp(`${municipality}`, 'ig');
       // get municipality id
       try {
         municipality_id = await getMunicipality({
-          name: municipality
+          name: regex
         });
         if (
           municipality_id.asyncResponse &&
@@ -70,13 +55,7 @@ module.exports = async (req, res, next) => {
         }
         //   display error
       } catch (err) {
-        req.responseData = {
-          statusCode: 400,
-          body: {
-            error: err
-          }
-        };
-        return next();
+        errorCatchAll(req, next, err);
       }
       // get barangays
       try {
@@ -88,33 +67,58 @@ module.exports = async (req, res, next) => {
         if (barangayList.asyncResponse) {
           barangayList = barangayList.asyncResponse;
         }
-        req.responseData = {
-          statusCode: 200,
-          body: {
-            data: barangayList
-          }
-        };
-        return next();
+        returnData(req, next, barangayList);
         //   display error
       } catch (error) {
-        req.responseData = {
-          statusCode: 400,
-          error: {
-            data: error
-          }
-        };
-        return next();
+        errorCatchAll(req, next, error);
       }
       //   incomplete parameter
       //   either municipality or province is missing
+    } else if (req.query.province) {
+      let province_id;
+      let regex = new RegExp(`${req.query.province}`, 'ig');
+      try {
+        province_id = await getProvince({
+          name: regex
+        }).then(response => {
+          return response.asyncResponse[0]._id;
+        });
+      } catch (error) {
+        errorCatchAll(req, next, error.message);
+      }
+      let municipalityList;
+      try {
+        municipalityList = await getMunicipality({
+          province_id: province_id
+        }).then(response => {
+          return response.asyncResponse;
+        });
+      } catch (error) {
+        errorCatchAll(req, next, error.message);
+      }
+      returnData(req, next, municipalityList);
     } else {
-      req.responseData = {
-        statusCode: 400,
-        body: {
-          error: 'Missing parameter'
-        }
-      };
-      return next();
+      errorCatchAll(req, next, 'Missing "province" parameter');
     }
   }
 };
+
+function errorCatchAll(req, next, response) {
+  req.responseData = {
+    statusCode: 400,
+    body: {
+      error: response
+    }
+  };
+  return next();
+}
+
+function returnData(req, next, data) {
+  req.responseData = {
+    statusCode: 200,
+    body: {
+      data: data
+    }
+  };
+  return next();
+}
